@@ -1,0 +1,68 @@
+{
+  "name": "open-in-local-browser",
+  "displayName": "Open in Local Browser",
+  "description": "Right-click an HTML file in a Remote-SSH window and open it in the browser on your own machine.",
+  "version": "0.1.0",
+  "publisher": "gongx030",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "openInLocalBrowser.open",
+        "title": "Open in Local Browser"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "openInLocalBrowser.open",
+          "when": "resourceLangId == html",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "openInLocalBrowser.open",
+          "when": "resourceLangId == html",
+          "group": "navigation"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "openInLocalBrowser.open",
+          "when": "resourceLangId == html"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "openInLocalBrowser.open",
+          "when": "resourceLangId == html"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "rm -rf out && tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "npm run compile && node --test \"out/test/*.test.js\"",
+    "package": "vsce package",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "1.90.0",
+    "@vscode/vsce": "^3.0.0",
+    "typescript": "^5.4.0"
+  }
+}
