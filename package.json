@@ -31,27 +31,27 @@
       "explorer/context": [
         {
           "command": "openInLocalBrowser.open",
-          "when": "resourceLangId == html",
+          "when": "resourceExtname =~ /^\\.(html?|pdf)$/i",
           "group": "navigation"
         }
       ],
       "editor/context": [
         {
           "command": "openInLocalBrowser.open",
-          "when": "resourceLangId == html",
+          "when": "resourceExtname =~ /^\\.(html?|pdf)$/i",
           "group": "navigation"
         }
       ],
       "editor/title/context": [
         {
           "command": "openInLocalBrowser.open",
-          "when": "resourceLangId == html"
+          "when": "resourceExtname =~ /^\\.(html?|pdf)$/i"
         }
       ],
       "commandPalette": [
         {
           "command": "openInLocalBrowser.open",
-          "when": "resourceLangId == html"
+          "when": "resourceExtname =~ /^\\.(html?|pdf)$/i"
         }
       ]
     }

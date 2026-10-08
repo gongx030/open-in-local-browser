@@ -13,6 +13,7 @@ before(async () => {
   fs.mkdirSync(path.join(dir, 'site', 'css'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'site', 'index.html'), '<h1>hi</h1>');
   fs.writeFileSync(path.join(dir, 'site', 'css', 'a.css'), 'h1{}');
+  fs.writeFileSync(path.join(dir, 'site', 'doc.pdf'), '%PDF-1.4');
   fs.writeFileSync(path.join(dir, 'secret.txt'), 'outside');
   server = await startStaticServer(path.join(dir, 'site'));
 });
@@ -34,6 +35,13 @@ test('the query token grants a cookie that loads the page assets', async () => {
   const css = await fetch(`${base()}/css/a.css`, { headers: { cookie } });
   assert.equal(css.status, 200);
   assert.equal(await css.text(), 'h1{}');
+});
+
+test('a PDF is served inline so the browser displays it', async () => {
+  const res = await fetch(`${base()}/doc.pdf?${TOKEN_PARAM}=${server.token}`);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('content-type'), 'application/pdf');
+  assert.equal(res.headers.get('content-disposition'), null);
 });
 
 test('requests without the token are refused', async () => {

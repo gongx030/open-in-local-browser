@@ -18,9 +18,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.commands.registerCommand('openInLocalBrowser.open', async (uri?: vscode.Uri) => {
-      const target = uri ?? vscode.window.activeTextEditor?.document.uri;
+      const target = uri ?? vscode.window.activeTextEditor?.document.uri ?? activeTabUri();
       if (!target || target.scheme !== 'file') {
-        vscode.window.showErrorMessage('Open in Local Browser: select an HTML file on disk.');
+        vscode.window.showErrorMessage('Open in Local Browser: select an HTML or PDF file on disk.');
         return;
       }
       // Serving from the workspace folder keeps links such as ../css/site.css working.
@@ -53,6 +53,14 @@ export function activate(context: vscode.ExtensionContext): void {
       },
     },
   );
+}
+
+/** The file in the active tab when it is not a text editor, such as a PDF viewer. */
+function activeTabUri(): vscode.Uri | undefined {
+  const input = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
+  return input instanceof vscode.TabInputText || input instanceof vscode.TabInputCustom
+    ? input.uri
+    : undefined;
 }
 
 export function deactivate(): void {}
