@@ -37,6 +37,12 @@ Files are read from disk on every request (`Cache-Control: no-store`), so
 saving the file and refreshing the browser shows the change. There is no
 automatic reload.
 
+Large HTML files (5 MB or more, typically self-contained pages with inlined
+images) can take minutes to arrive over the forwarded port, and the browser
+would show a blank tab meanwhile. For these the server first returns a small
+loading page that downloads the file with a progress bar and then replaces
+itself with it, keeping the same URL so relative links still resolve.
+
 ## Access control
 
 Other users on a shared host can connect to a `127.0.0.1` port. Each server

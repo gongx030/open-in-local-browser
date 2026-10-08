@@ -3,7 +3,13 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { after, before, test } from 'node:test';
-import { StaticServer, TOKEN_PARAM, startStaticServer } from '../staticServer';
+import {
+  LOADER_MIN_BYTES,
+  RAW_PARAM,
+  StaticServer,
+  TOKEN_PARAM,
+  startStaticServer,
+} from '../staticServer';
 
 let dir: string;
 let server: StaticServer;
@@ -14,6 +20,7 @@ before(async () => {
   fs.writeFileSync(path.join(dir, 'site', 'index.html'), '<h1>hi</h1>');
   fs.writeFileSync(path.join(dir, 'site', 'css', 'a.css'), 'h1{}');
   fs.writeFileSync(path.join(dir, 'site', 'doc.pdf'), '%PDF-1.4');
+  fs.writeFileSync(path.join(dir, 'site', 'big.html'), 'x'.repeat(LOADER_MIN_BYTES));
   fs.writeFileSync(path.join(dir, 'secret.txt'), 'outside');
   server = await startStaticServer(path.join(dir, 'site'));
 });
@@ -54,4 +61,13 @@ test('paths outside the root are not served', async () => {
     const res = await fetch(`${base()}${p}?${TOKEN_PARAM}=${server.token}`);
     assert.equal(res.status, 404, p);
   }
+});
+
+test('a large HTML file gets a loading page, and the raw parameter returns the file', async () => {
+  const loader = await fetch(`${base()}/big.html?${TOKEN_PARAM}=${server.token}`);
+  assert.equal(loader.status, 200);
+  assert.match(await loader.text(), /\.getReader\(\)/);
+
+  const raw = await fetch(`${base()}/big.html?${TOKEN_PARAM}=${server.token}&${RAW_PARAM}=1`);
+  assert.equal((await raw.text()).length, LOADER_MIN_BYTES);
 });

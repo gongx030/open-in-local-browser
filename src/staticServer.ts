@@ -7,6 +7,75 @@ import * as path from 'path';
 /** Query parameter carrying the token on the first request; a cookie carries it after that. */
 export const TOKEN_PARAM = 'token';
 
+/** Query parameter that skips the loading page and returns the file itself. */
+export const RAW_PARAM = 'raw';
+
+/**
+ * HTML files at least this large get a loading page first. Over a forwarded
+ * port a large self-contained page (inlined images) can take minutes to
+ * arrive, and the browser shows a blank tab until then.
+ */
+export const LOADER_MIN_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Downloads the page with `?raw` while showing progress, then replaces itself
+ * with the result. Writing into this document keeps the URL, so relative
+ * links resolve as if the file had been loaded directly.
+ */
+const LOADER_PAGE = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Loading…</title>
+<style>
+body { font: 15px system-ui, sans-serif; color: #333; max-width: 36em; margin: 30vh auto 0; }
+progress { width: 100%; }
+</style>
+</head>
+<body>
+<p id="msg">Loading…</p>
+<progress id="bar"></progress>
+<script>
+(async () => {
+  const msg = document.getElementById('msg');
+  const bar = document.getElementById('bar');
+  const name = decodeURIComponent(location.pathname.split('/').pop());
+  const mb = (n) => (n / 1048576).toFixed(1);
+  const url = new URL(location.href);
+  url.searchParams.set('${RAW_PARAM}', '1');
+  url.hash = '';
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const total = Number(res.headers.get('content-length'));
+    if (total) bar.max = total;
+    const reader = res.body.getReader();
+    const chunks = [];
+    let received = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.length;
+      if (total) bar.value = received;
+      msg.textContent =
+        'Loading ' + name + ': ' + mb(received) + (total ? ' of ' + mb(total) : '') + ' MB';
+    }
+    const html = await new Blob(chunks).text();
+    document.open();
+    document.write(html);
+    document.close();
+  } catch (err) {
+    bar.remove();
+    msg.textContent =
+      'Could not load ' + name + ' (' + err.message + '). Run Open in Local Browser again in VS Code.';
+  }
+})();
+</script>
+</body>
+</html>
+`;
+
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.htm': 'text/html; charset=utf-8',
@@ -94,9 +163,14 @@ function serve(
     if (!found) {
       return end(res, 404, 'Not found');
     }
+    const ext = path.extname(found.file).toLowerCase();
+    const loader =
+      (ext === '.html' || ext === '.htm') &&
+      found.size >= LOADER_MIN_BYTES &&
+      !url.searchParams.has(RAW_PARAM);
     const headers: http.OutgoingHttpHeaders = {
-      'Content-Type': MIME_TYPES[path.extname(found.file).toLowerCase()] ?? 'application/octet-stream',
-      'Content-Length': found.size,
+      'Content-Type': MIME_TYPES[loader ? '.html' : ext] ?? 'application/octet-stream',
+      'Content-Length': loader ? Buffer.byteLength(LOADER_PAGE) : found.size,
       // Always re-read from disk, so a browser refresh shows the latest save.
       'Cache-Control': 'no-store',
     };
@@ -106,6 +180,10 @@ function serve(
     res.writeHead(200, headers);
     if (req.method === 'HEAD') {
       res.end();
+      return;
+    }
+    if (loader) {
+      res.end(LOADER_PAGE);
       return;
     }
     fs.createReadStream(found.file)
