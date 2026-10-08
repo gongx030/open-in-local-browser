@@ -1,12 +1,13 @@
 # open-in-local-browser
 
-In a VS Code Remote-SSH window, right-click an HTML file and choose **Open in
-Local Browser**. The page opens in the default browser on your own machine
-(for example, the Mac you are connecting from), not in a VS Code panel.
+In a VS Code Remote-SSH window, right-click an HTML or PDF file and choose
+**Open in Local Browser**. The file opens in the default browser on your own
+machine (for example, the Mac you are connecting from), not in a VS Code panel.
+PDFs are shown by the browser's built-in PDF viewer.
 
 The command is in the Explorer context menu, the editor context menu, the
-editor tab context menu, and the Command Palette, for files VS Code treats as
-HTML (`.html`, `.htm`, …).
+editor tab context menu, and the Command Palette, for files ending in `.html`,
+`.htm` or `.pdf` (case-insensitive).
 
 ## Install
 

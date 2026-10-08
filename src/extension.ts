@@ -20,7 +20,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('openInLocalBrowser.open', async (uri?: vscode.Uri) => {
       const target = uri ?? vscode.window.activeTextEditor?.document.uri;
       if (!target || target.scheme !== 'file') {
-        vscode.window.showErrorMessage('Open in Local Browser: select an HTML file on disk.');
+        vscode.window.showErrorMessage('Open in Local Browser: select an HTML or PDF file on disk.');
         return;
       }
       // Serving from the workspace folder keeps links such as ../css/site.css working.
