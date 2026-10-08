@@ -5,7 +5,6 @@ import * as path from 'node:path';
 import { after, before, test } from 'node:test';
 import {
   LOADER_MIN_BYTES,
-  RAW_PARAM,
   StaticServer,
   TOKEN_PARAM,
   startStaticServer,
@@ -63,11 +62,11 @@ test('paths outside the root are not served', async () => {
   }
 });
 
-test('a large HTML file gets a loading page, and the raw parameter returns the file', async () => {
-  const loader = await fetch(`${base()}/big.html?${TOKEN_PARAM}=${server.token}`);
-  assert.equal(loader.status, 200);
+test('navigating to a large HTML file gets a loading page; other requests get the file', async () => {
+  const url = `${base()}/big.html?${TOKEN_PARAM}=${server.token}`;
+  const loader = await fetch(url, { headers: { 'sec-fetch-dest': 'document' } });
   assert.match(await loader.text(), /\.getReader\(\)/);
 
-  const raw = await fetch(`${base()}/big.html?${TOKEN_PARAM}=${server.token}&${RAW_PARAM}=1`);
-  assert.equal((await raw.text()).length, LOADER_MIN_BYTES);
+  const file = await fetch(url);
+  assert.equal((await file.text()).length, LOADER_MIN_BYTES);
 });

@@ -3,24 +3,23 @@ import * as fs from 'fs';
 import * as http from 'http';
 import { AddressInfo } from 'net';
 import * as path from 'path';
+import * as stream from 'stream';
 
 /** Query parameter carrying the token on the first request; a cookie carries it after that. */
 export const TOKEN_PARAM = 'token';
 
-/** Query parameter that skips the loading page and returns the file itself. */
-export const RAW_PARAM = 'raw';
-
 /**
- * HTML files at least this large get a loading page first. Over a forwarded
- * port a large self-contained page (inlined images) can take minutes to
- * arrive, and the browser shows a blank tab until then.
+ * HTML files at least this large get a loading page when the browser navigates
+ * to them. Over a forwarded port a large self-contained page (inlined images)
+ * can take minutes to arrive, and the browser shows a blank tab until then.
  */
 export const LOADER_MIN_BYTES = 5 * 1024 * 1024;
 
 /**
- * Downloads the page with `?raw` while showing progress, then replaces itself
- * with the result. Writing into this document keeps the URL, so relative
- * links resolve as if the file had been loaded directly.
+ * Downloads the page with `fetch` (not a navigation, so it gets the file
+ * itself) while showing progress, then replaces itself with the result.
+ * Writing into this document keeps the URL, so relative links resolve as if
+ * the file had been loaded directly.
  */
 const LOADER_PAGE = `<!DOCTYPE html>
 <html>
@@ -41,12 +40,17 @@ progress { width: 100%; }
   const bar = document.getElementById('bar');
   const name = decodeURIComponent(location.pathname.split('/').pop());
   const mb = (n) => (n / 1048576).toFixed(1);
-  const url = new URL(location.href);
-  url.searchParams.set('${RAW_PARAM}', '1');
-  url.hash = '';
+  // A dropped forward can leave the socket open with no data and no error.
+  const abort = new AbortController();
+  let stall;
+  const watch = () => {
+    clearTimeout(stall);
+    stall = setTimeout(() => abort.abort(new Error('no data received for 60 s')), 60000);
+  };
   try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    watch();
+    const res = await fetch(location.href, { signal: abort.signal });
+    if (!res.ok) throw new Error((await res.text()) || 'HTTP ' + res.status);
     const total = Number(res.headers.get('content-length'));
     if (total) bar.max = total;
     const reader = res.body.getReader();
@@ -54,6 +58,7 @@ progress { width: 100%; }
     let received = 0;
     for (;;) {
       const { done, value } = await reader.read();
+      watch();
       if (done) break;
       chunks.push(value);
       received += value.length;
@@ -61,11 +66,16 @@ progress { width: 100%; }
       msg.textContent =
         'Loading ' + name + ': ' + mb(received) + (total ? ' of ' + mb(total) : '') + ' MB';
     }
+    clearTimeout(stall);
+    if (total && received !== total) {
+      throw new Error('got ' + mb(received) + ' of ' + mb(total) + ' MB; the file may have changed');
+    }
     const html = await new Blob(chunks).text();
     document.open();
     document.write(html);
     document.close();
   } catch (err) {
+    clearTimeout(stall);
     bar.remove();
     msg.textContent =
       'Could not load ' + name + ' (' + err.message + '). Run Open in Local Browser again in VS Code.';
@@ -167,7 +177,8 @@ function serve(
     const loader =
       (ext === '.html' || ext === '.htm') &&
       found.size >= LOADER_MIN_BYTES &&
-      !url.searchParams.has(RAW_PARAM);
+      // Only navigations: fetch(), curl and the loader itself get the file.
+      ['document', 'iframe'].includes(String(req.headers['sec-fetch-dest']));
     const headers: http.OutgoingHttpHeaders = {
       'Content-Type': MIME_TYPES[loader ? '.html' : ext] ?? 'application/octet-stream',
       'Content-Length': loader ? Buffer.byteLength(LOADER_PAGE) : found.size,
@@ -186,9 +197,8 @@ function serve(
       res.end(LOADER_PAGE);
       return;
     }
-    fs.createReadStream(found.file)
-      .on('error', () => res.destroy())
-      .pipe(res);
+    // pipeline closes the file if the browser disconnects mid-download.
+    stream.pipeline(fs.createReadStream(found.file), res, () => undefined);
   });
 }
 
